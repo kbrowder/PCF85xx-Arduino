@@ -1,30 +1,11 @@
-
+/**
+ * \author Kevin Browder
+ * \copyright GNU Public License.
+ **/
 #include "PCF85xxRTC.h"
 #include "Stream.h"
 #include <EEPROM.h>
-struct DAY_YEAR {
-	uint8_t day_u :4;
-	uint8_t day_t :2;
-	uint8_t year_off :2;
-};
-struct WEEKDAY_MONTH {
-	uint8_t month_u :4;
-	uint8_t month_t :1;
-	uint8_t dow :3;
-};
-struct HOURS {
-	uint8_t hour_u :4;
-	uint8_t hour_t :2;
-	bool am :1;
-	bool is24hr :1;
-};
 
-inline uint8_t from_bcd(uint8_t in) {
-	return 10 * (in >> 4) + (in & 0xF);
-}
-inline uint8_t to_bcd(uint8_t in) {
-	return ((in / 10) << 4) | (in % 10);
-}
 const uint8_t PCF85xx::READ_ADDR = 0xA2 >> 1;
 const uint8_t PCF85xx::WRITE_ADDR = 0xA3 >> 1;
 
@@ -32,7 +13,7 @@ const uint8_t PCF85xx::EEPROM_ADDR = 0;
 PCF85xx PCF85xx::defaultRTC;
 
 void PCF85xx::initControlReg() {
-	this->controlReg.clear();
+	memset(&this->controlReg, 0, sizeof(this->controlReg));
 }
 time_t PCF85xx::timeFromEEPROM() {
 	/* returning !0 means unset */
@@ -72,11 +53,16 @@ time_t PCF85xx::getDefaultTime() {
 void PCF85xx::setDefaultTime(time_t t) {
 	PCF85xx::getDefaultRTC()->set(t);
 }
+uint8_t PCF85xx::to_uint8(void * s) {
+	uint8_t * i = (uint8_t*) s;
+	return *i;
+}
 void PCF85xx::setup() {
-	this->writeByte(this->STATUS_CONTROL_REG, this->controlReg.toInt());
+	this->writeByte(this->STATUS_CONTROL_REG,
+			this->to_uint8(&this->controlReg));
 }
 void PCF85xx::reset() {
-	this->writeByte(this->STATUS_CONTROL_REG, 0);
+	this->setup();
 
 	tmElements_t tm;
 	tm.Year = CalendarYrToTm(2011);
@@ -99,42 +85,38 @@ time_t PCF85xx::get() {
 
 void PCF85xx::read(tmElements_t &tm) {
 	this->wire.beginTransmission(this->READ_ADDR);
-	this->wire.write(this->SEC_REG);
+	this->wire.write(this->HUNDRETH_SEC_REG);
 	this->wire.endTransmission();
-	const size_t num_results = 5;
-	this->wire.requestFrom(this->READ_ADDR, num_results);
-	uint8_t results[num_results];
-	this->wire.readBytes((char*) results, num_results);
+	TIME time;
 
-	tm.Second = from_bcd(results[0]);
-	tm.Minute = from_bcd(results[1]);
+	this->wire.requestFrom(this->READ_ADDR, sizeof(time));
+	this->wire.readBytes((char*) &time, sizeof(time));
+
+	tm.Second = time.seconds.ten * 10L + time.seconds.unit;
+	tm.Minute = time.minutes.ten * 10L + time.minutes.unit;
 	//for hour the two msb are The "12 Hour flag" (bit 7)
 	//  and the subordinant "pm flag" (bit 6)
+	tm.Hour = time.hours.hour_t * 10L + time.hours.hour_u;
+	tm.Day = time.day_year.day_t;
+	tm.Day *= (uint8_t) 10;
+	tm.Day += (uint8_t) time.day_year.day_u;
 
-	HOURS * hour = (struct HOURS *) (results + 2);
-	tm.Hour = hour->hour_t * 10 + hour->hour_u;
-
-	DAY_YEAR * day_year = (struct DAY_YEAR *) (results + 3);
-	tm.Day = day_year->day_t * 10 + day_year->day_u;
 	uint16_t eeprom_year = year(this->timeFromEEPROM());
-	uint16_t year = eeprom_year + (uint16_t) (day_year->year_off);
+	uint16_t year = eeprom_year + (uint16_t) (time.day_year.year_off);
 	tm.Year = CalendarYrToTm(year);
 
-	WEEKDAY_MONTH * wdm = (struct WEEKDAY_MONTH *) (results + 4);
-	tm.Wday = wdm->dow;
-	tm.Month = wdm->month_t * 10 + wdm->month_u;
+	tm.Wday = time.wday_month.dow;
+	tm.Month = time.wday_month.month_t * 10L + time.wday_month.month_u;
 
 	//update eeprom if year_off > 0 so next time year_off=0
 	// ensuring we're never overflow 3 bits.
-	if (day_year->year_off > 0) {
-		//Serial.println("Updating eeprom time on read");
+	if (time.day_year.year_off > 0) {
 		this->timeToEEPROM(makeTime(tm));
-		day_year->year_off = 0;
-		uint8_t * dy_ptr = results + 8;
-		dy_ptr = (uint8_t*) day_year;
-		this->writeByte(this->YEAR_REG, *dy_ptr);
+		time.day_year.year_off = 0;
+		this->writeByte(this->YEAR_REG, this->to_uint8(&time.day_year));
 	}
 }
+
 void PCF85xx::set(time_t t) {
 	tmElements_t tm;
 	breakTime(t, tm);
@@ -144,44 +126,37 @@ void PCF85xx::write(tmElements_t &tm) {
 	time_t eeprom_time = this->timeFromEEPROM();
 	int year_off = (int) tmYearToCalendar(tm.Year) - (int) year(eeprom_time);
 	if ((!eeprom_time) == 0 || year_off >= 3 || year_off < 0) { //unset eeprom or bad offsets
-		//Serial.println("Updating eeprom time on write");
 		eeprom_time = makeTime(tm);
 		this->timeToEEPROM(eeprom_time);
 		year_off = 0;
 	}
+	TIME time;
 
-	HOURS hour;
-	hour.is24hr = hour.am = 0;
-	hour.hour_t = tm.Hour / 10;
-	hour.hour_u = tm.Hour % 10;
-	uint8_t * hour_i = (uint8_t*) &hour;
+	time.hours.is24hr = time.hours.am = 0;
+	time.hours.hour_t = tm.Hour / 10;
+	time.hours.hour_u = tm.Hour % 10;
 
-	DAY_YEAR dy;
-	dy.day_t = tm.Day / 10;
-	dy.day_u = tm.Day % 10;
+	time.day_year.day_t = tm.Day / 10;
+	time.day_year.day_u = tm.Day % 10;
 
-	dy.year_off = year_off;
-	uint8_t * day_i = (uint8_t*) &dy;
+	time.day_year.year_off = year_off;
 
-	WEEKDAY_MONTH wm;
-	wm.month_t = tm.Month / 10;
-	wm.month_u = tm.Month % 10;
-	wm.dow = tm.Wday;
-	uint8_t * wm_i = (uint8_t*) &wm;
+	time.wday_month.month_t = tm.Month / 10;
+	time.wday_month.month_u = tm.Month % 10;
+	time.wday_month.dow = tm.Wday;
+
+	time.minutes.ten = tm.Minute / 10;
+	time.minutes.unit = tm.Minute % 10;
+
+	time.seconds.ten = tm.Second / 10;
+	time.seconds.unit = tm.Second % 10;
 
 	this->wire.beginTransmission(this->WRITE_ADDR);
-	this->wire.write(this->SEC_REG); //Starting address
-
-	this->wire.write(to_bcd(tm.Second));
-
-	this->wire.write(to_bcd(tm.Minute));
-
-	this->wire.write(*hour_i);
-
-	this->wire.write(*day_i);
-
-	this->wire.write(*wm_i);
-
+	this->wire.write(this->HUNDRETH_SEC_REG + 1); //Starting address
+	uint8_t * data = (uint8_t*) &(time.seconds);
+	for (uint8_t i = 0; i < sizeof(time) - 1; i++) {
+		this->wire.write(data[i]);
+	}
 	this->wire.endTransmission();
 }
 void PCF85xx::writeByte(uint8_t word, uint8_t value) {
@@ -200,23 +175,4 @@ uint8_t PCF85xx::readByte(uint8_t word) {
 		this->wire.readBytes(&result, (long unsigned int) 1);
 	}
 	return (uint8_t) result;
-}
-uint8_t PCF85xx::readHundredths() {
-	return from_bcd(this->readByte(this->HUNDRETH_SEC_REG));
-
-}
-
-ControlRegister::ControlRegister() {
-	this->clear();
-}
-void ControlRegister::clear() {
-	memset(&this->controlRegisterData, 0, sizeof(this->controlRegisterData)); //clear controlReg
-}
-
-uint8_t ControlRegister::toInt() {
-	return *(uint8_t *) &this->controlRegisterData;
-}
-
-ControlRegister::CONTROL_REG * ControlRegister::getData() {
-	return &this->controlRegisterData;
 }
