@@ -35,12 +35,12 @@
 								<option id="it.baeyens.avreclipse.compiler.option.optimize.1229451333" name="Optimization Level" superClass="it.baeyens.avreclipse.compiler.option.optimize" value="it.baeyens.avreclipse.compiler.optimize.size" valueType="enumerated"/>
 								<option id="it.baeyens.avreclipse.compiler.option.incpath.83382774" name="Include Paths (-I)" superClass="it.baeyens.avreclipse.compiler.option.incpath" valueType="includePath">
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ARDUINOBOARDNAME}/arduino}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ARDUINOBOARDNAME}/${ARDUINOBOARDVARIANT}}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/PCF85xxRTC}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/PCF85xxRTC/EEPROM}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/PCF85xxRTC/Time}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/PCF85xxRTC/Wire}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/PCF85xxRTC/Wire/utility}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ARDUINOBOARDNAME}/${ARDUINOBOARDVARIANT}}&quot;"/>
 								</option>
 								<option id="it.baeyens.avreclipse.compiler.option.def.1485111403" name="Define Syms (-D)" superClass="it.baeyens.avreclipse.compiler.option.def" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="__IN_ECLIPSE__=1"/>
@@ -58,13 +58,13 @@
 								<option id="it.baeyens.avreclipse.cppcompiler.option.debug.level.1244205041" name="Generate Debugging Info" superClass="it.baeyens.avreclipse.cppcompiler.option.debug.level" value="it.baeyens.avreclipse.cppcompiler.option.debug.level.none" valueType="enumerated"/>
 								<option id="it.baeyens.avreclipse.cppcompiler.option.optimize.718166427" name="Optimization Level" superClass="it.baeyens.avreclipse.cppcompiler.option.optimize" value="it.baeyens.avreclipse.cppcompiler.optimize.size" valueType="enumerated"/>
 								<option id="it.baeyens.avreclipse.cppcompiler.option.incpath.404803734" name="Include Paths (-I)" superClass="it.baeyens.avreclipse.cppcompiler.option.incpath" valueType="includePath">
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ARDUINOBOARDNAME}/arduino}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ARDUINOBOARDNAME}/${ARDUINOBOARDVARIANT}}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/PCF85xxRTC}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/PCF85xxRTC/EEPROM}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/PCF85xxRTC/Time}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/PCF85xxRTC/Wire}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/PCF85xxRTC/Wire/utility}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ARDUINOBOARDNAME}/arduino}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ARDUINOBOARDNAME}/${ARDUINOBOARDVARIANT}}&quot;"/>
 								</option>
 								<option id="it.baeyens.avreclipse.cppcompiler.option.def.479432623" name="Define Syms (-D)" superClass="it.baeyens.avreclipse.cppcompiler.option.def" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="__IN_ECLIPSE__=1"/>
