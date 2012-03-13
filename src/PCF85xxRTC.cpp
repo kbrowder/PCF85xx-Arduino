@@ -6,6 +6,14 @@
 #include "Stream.h"
 #include <EEPROM.h>
 
+uint64_t makeTimeMilli(tmElementsWithMillis tm) {
+	tmElements_t * tmSimple;
+	tmSimple = (tmElements_t*) &tm;
+	return tm.Milliseconds + makeTimeMilli(*tmSimple);
+}
+uint64_t makeTimeMilli(tmElements_t tm) {
+	return ((uint64_t) makeTime(tm) * 1000);
+}
 const uint8_t PCF85xx::READ_ADDR = 0xA2 >> 1;
 const uint8_t PCF85xx::WRITE_ADDR = 0xA3 >> 1;
 
@@ -15,19 +23,18 @@ PCF85xx PCF85xx::defaultRTC;
 void PCF85xx::initControlReg() {
 	memset(&this->controlReg, 0, sizeof(this->controlReg));
 }
-time_t PCF85xx::timeFromEEPROM() {
+uint64_t PCF85xx::timeFromEEPROM() {
 	/* returning !0 means unset */
-	time_t result = 0;
-	for (int i = 0; i < 4; i++) {
+	uint64_t result = 0;
+	for (uint8_t i = 0; i < sizeof(result); i++) {
 		uint8_t d = EEPROM.read((int) (EEPROM_ADDR + i));
-		result |= ((uint32_t) d) << (8 * i);
+		result |= ((uint64_t) d) << (8 * i);
 	}
 	return result;
-
 }
 
-void PCF85xx::timeToEEPROM(time_t time) {
-	for (int i = 0; i < 4; i++) {
+void PCF85xx::timeToEEPROM(uint64_t time) {
+	for (uint8_t i = 0; i < sizeof(time); i++) {
 		EEPROM.write((int) (EEPROM_ADDR + i),
 				(uint8_t) ((time >> (8 * i)) & 0xFF));
 	}
@@ -82,8 +89,7 @@ time_t PCF85xx::get() {
 	this->read(tm);
 	return makeTime(tm);
 }
-
-void PCF85xx::read(tmElements_t &tm) {
+void PCF85xx::read(tmElementsWithMillis &tm) {
 	this->wire.beginTransmission(this->READ_ADDR);
 	this->wire.write(this->HUNDRETH_SEC_REG);
 	this->wire.endTransmission();
@@ -108,13 +114,19 @@ void PCF85xx::read(tmElements_t &tm) {
 	tm.Wday = time.wday_month.dow;
 	tm.Month = time.wday_month.month_t * 10L + time.wday_month.month_u;
 
+	tm.Milliseconds = 10 * ((uint16_t) (time.hundredths.ten * 10 + time.hundredths.unit));
 	//update eeprom if year_off > 0 so next time year_off=0
 	// ensuring we're never overflow 3 bits.
 	if (time.day_year.year_off > 0) {
-		this->timeToEEPROM(makeTime(tm));
+		this->timeToEEPROM(makeTimeMilli(tm));
 		time.day_year.year_off = 0;
 		this->writeByte(this->YEAR_REG, this->to_uint8(&time.day_year));
 	}
+}
+void PCF85xx::read(tmElements_t &tm) {
+	tmElementsWithMillis tmMillis;
+	this->read(tmMillis);
+	memcpy(&tm, &tmMillis, sizeof(tm));
 }
 
 void PCF85xx::set(time_t t) {

@@ -7,9 +7,17 @@
 #include "Arduino.h"
 #include <Wire.h>
 #include <Time.h>
-namespace PCF85xxData {
 
-}
+struct tmElementsWithMillis{
+	  uint8_t Second;
+	  uint8_t Minute;
+	  uint8_t Hour;
+	  uint8_t Wday;   // day of week, sunday is day 1
+	  uint8_t Day;
+	  uint8_t Month;
+	  uint8_t Year;   // offset from 1970;
+	  uint16_t Milliseconds;
+	};
 class PCF85xxTypes {
 protected:
 	enum REGISTERS {
@@ -84,7 +92,12 @@ protected:
 		uint8_t timer :8;
 		struct ALARM_CONTROL alarm;
 	};
+
 };
+
+inline uint64_t makeTimeMilli(tmElementsWithMillis);
+inline uint64_t makeTimeMilli(tmElements_t);
+
 
 class PCF85xx: PCF85xxTypes {
 private:
@@ -97,8 +110,8 @@ protected:
 	TwoWire wire;
 	const static uint8_t EEPROM_ADDR;
 	void initControlReg();
-	time_t timeFromEEPROM();
-	void timeToEEPROM(time_t);
+	uint64_t timeFromEEPROM();
+	void timeToEEPROM(uint64_t);
 	static uint8_t to_uint8(void * s);
 public:
 	PCF85xx();
@@ -111,6 +124,7 @@ public:
 	void reset();
 	time_t get();
 	void set(time_t t);
+	void read(tmElementsWithMillis &tm);
 	void read(tmElements_t &tm);
 	void write(tmElements_t &tm);
 	void writeByte(uint8_t word, uint8_t value);
