@@ -2,7 +2,7 @@ A simple library that supports the NXP PCF85xx Serials of Real Time Clocks on th
 
 ==Requirements==
 * [http://www.arduino.cc/playground/Code/Time Time]
-* [http://arduino.cc] or compatible product (eg an AVR Microcontroller).
+* [http://arduino.cc Arduino] or compatible product (eg an AVR Microcontroller).
 * [http://ics.nxp.com/products/real.time.clock.calendars/i2c/ NXP PCF85xx] Series RTC
 
 ==Author==
