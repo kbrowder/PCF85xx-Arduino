@@ -107,14 +107,15 @@ void PCF85xx::read(tmElementsWithMillis &tm) {
 	tm.Day *= (uint8_t) 10;
 	tm.Day += (uint8_t) time.day_year.day_u;
 
-	uint16_t eeprom_year = year(this->timeFromEEPROM());
+	uint16_t eeprom_year = year(this->timeFromEEPROM()/1000);
 	uint16_t year = eeprom_year + (uint16_t) (time.day_year.year_off);
 	tm.Year = CalendarYrToTm(year);
 
 	tm.Wday = time.wday_month.dow;
 	tm.Month = time.wday_month.month_t * 10L + time.wday_month.month_u;
 
-	tm.Milliseconds = 10 * ((uint16_t) (time.hundredths.ten * 10 + time.hundredths.unit));
+	tm.Milliseconds = 10
+			* ((uint16_t) (time.hundredths.ten * 10 + time.hundredths.unit));
 	//update eeprom if year_off > 0 so next time year_off=0
 	// ensuring we're never overflow 3 bits.
 	if (time.day_year.year_off > 0) {
@@ -134,11 +135,11 @@ void PCF85xx::set(time_t t) {
 	breakTime(t, tm);
 	this->write(tm);
 }
-void PCF85xx::write(tmElements_t &tm) {
-	time_t eeprom_time = this->timeFromEEPROM();
-	int year_off = (int) tmYearToCalendar(tm.Year) - (int) year(eeprom_time);
+void PCF85xx::write(tmElementsWithMillis &tm) {
+	uint64_t eeprom_time = this->timeFromEEPROM();
+	int year_off = (int) tmYearToCalendar(tm.Year) - (int) year(eeprom_time/1000);
 	if ((!eeprom_time) == 0 || year_off >= 3 || year_off < 0) { //unset eeprom or bad offsets
-		eeprom_time = makeTime(tm);
+		eeprom_time = makeTimeMilli(tm);
 		this->timeToEEPROM(eeprom_time);
 		year_off = 0;
 	}
@@ -163,13 +164,22 @@ void PCF85xx::write(tmElements_t &tm) {
 	time.seconds.ten = tm.Second / 10;
 	time.seconds.unit = tm.Second % 10;
 
+	time.hundredths.ten = (tm.Milliseconds / 10) / 10;
+	time.hundredths.unit = (tm.Milliseconds / 10) % 10;
+
 	this->wire.beginTransmission(this->WRITE_ADDR);
-	this->wire.write(this->HUNDRETH_SEC_REG + 1); //Starting address
-	uint8_t * data = (uint8_t*) &(time.seconds);
-	for (uint8_t i = 0; i < sizeof(time) - 1; i++) {
+	this->wire.write(this->HUNDRETH_SEC_REG); //Starting address
+	uint8_t * data = (uint8_t*) &time;
+	for (uint8_t i = 0; i < sizeof(time); i++) {
 		this->wire.write(data[i]);
 	}
 	this->wire.endTransmission();
+}
+void PCF85xx::write(tmElements_t &tm) {
+	tmElementsWithMillis tmMillis;
+	memset(&tmMillis, 0, sizeof(tmMillis));
+	memcpy(&tmMillis, &tm, sizeof(tm));
+	this->write(tmMillis);
 }
 void PCF85xx::writeByte(uint8_t word, uint8_t value) {
 	this->wire.beginTransmission(this->WRITE_ADDR);

@@ -127,6 +127,7 @@ public:
 	void read(tmElementsWithMillis &tm);
 	void read(tmElements_t &tm);
 	void write(tmElements_t &tm);
+	void write(tmElementsWithMillis &tm);
 	void writeByte(uint8_t word, uint8_t value);
 	uint8_t readByte(uint8_t word);
 	uint8_t readHundredths();
