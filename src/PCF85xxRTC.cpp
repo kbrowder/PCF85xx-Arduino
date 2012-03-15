@@ -3,9 +3,7 @@
  * \copyright GNU Public License.
  **/
 #include "PCF85xxRTC.h"
-#include "Stream.h"
 #include <EEPROM.h>
-
 uint64_t makeTimeMilli(tmElementsWithMillis tm) {
 	tmElements_t * tmSimple;
 	tmSimple = (tmElements_t*) &tm;
@@ -14,39 +12,28 @@ uint64_t makeTimeMilli(tmElementsWithMillis tm) {
 uint64_t makeTimeMilli(tmElements_t tm) {
 	return ((uint64_t) makeTime(tm) * 1000);
 }
+
 const uint8_t PCF85xx::READ_ADDR = 0xA2 >> 1;
 const uint8_t PCF85xx::WRITE_ADDR = 0xA3 >> 1;
-
-const uint8_t PCF85xx::EEPROM_ADDR = 0;
 PCF85xx PCF85xx::defaultRTC;
+
+EEPROMTimeSaver PCF85xx::defaultTimeSaver = EEPROMTimeSaver();
 
 void PCF85xx::initControlReg() {
 	memset(&this->controlReg, 0, sizeof(this->controlReg));
 }
-uint64_t PCF85xx::timeFromEEPROM() {
-	/* returning !0 means unset */
-	uint64_t result = 0;
-	for (uint8_t i = 0; i < sizeof(result); i++) {
-		uint8_t d = EEPROM.read((int) (EEPROM_ADDR + i));
-		result |= ((uint64_t) d) << (8 * i);
-	}
-	return result;
-}
-
-void PCF85xx::timeToEEPROM(uint64_t time) {
-	for (uint8_t i = 0; i < sizeof(time); i++) {
-		EEPROM.write((int) (EEPROM_ADDR + i),
-				(uint8_t) ((time >> (8 * i)) & 0xFF));
-	}
-}
 
 PCF85xx::PCF85xx() {
-	this->init(TwoWire());
+	this->init(TwoWire(), &this->defaultTimeSaver);
 }
-PCF85xx::PCF85xx(TwoWire wire) {
-	this->init(wire);
+PCF85xx::~PCF85xx() {
 }
-void PCF85xx::init(TwoWire wire) {
+
+PCF85xx::PCF85xx(TwoWire wire, AbstractTimeSaver * timeSaver) {
+	this->init(wire, timeSaver);
+}
+void PCF85xx::init(TwoWire wire, AbstractTimeSaver * timeSaver) {
+	this->timeSaver = timeSaver;
 	this->wire = wire;
 	this->wire.begin();
 }
@@ -70,7 +57,7 @@ void PCF85xx::setup() {
 }
 void PCF85xx::reset() {
 	this->setup();
-
+	this->clearSave();
 	tmElements_t tm;
 	tm.Year = CalendarYrToTm(2011);
 	tm.Month = 12;
@@ -107,7 +94,7 @@ void PCF85xx::read(tmElementsWithMillis &tm) {
 	tm.Day *= (uint8_t) 10;
 	tm.Day += (uint8_t) time.day_year.day_u;
 
-	uint16_t eeprom_year = year(this->timeFromEEPROM()/1000);
+	uint16_t eeprom_year = year(this->load() / 1000);
 	uint16_t year = eeprom_year + (uint16_t) (time.day_year.year_off);
 	tm.Year = CalendarYrToTm(year);
 
@@ -119,7 +106,7 @@ void PCF85xx::read(tmElementsWithMillis &tm) {
 	//update eeprom if year_off > 0 so next time year_off=0
 	// ensuring we're never overflow 3 bits.
 	if (time.day_year.year_off > 0) {
-		this->timeToEEPROM(makeTimeMilli(tm));
+		this->save(makeTimeMilli(tm));
 		time.day_year.year_off = 0;
 		this->writeByte(this->YEAR_REG, this->to_uint8(&time.day_year));
 	}
@@ -136,11 +123,13 @@ void PCF85xx::set(time_t t) {
 	this->write(tm);
 }
 void PCF85xx::write(tmElementsWithMillis &tm) {
-	uint64_t eeprom_time = this->timeFromEEPROM();
-	int year_off = (int) tmYearToCalendar(tm.Year) - (int) year(eeprom_time/1000);
+	uint64_t eeprom_time = this->load();
+
+	uint16_t year_off = (int) tmYearToCalendar(tm.Year)
+			- (int) year(eeprom_time / 1000);
 	if ((!eeprom_time) == 0 || year_off >= 3 || year_off < 0) { //unset eeprom or bad offsets
 		eeprom_time = makeTimeMilli(tm);
-		this->timeToEEPROM(eeprom_time);
+		this->save(eeprom_time);
 		year_off = 0;
 	}
 	TIME time;
@@ -197,4 +186,15 @@ uint8_t PCF85xx::readByte(uint8_t word) {
 		this->wire.readBytes(&result, (long unsigned int) 1);
 	}
 	return (uint8_t) result;
+}
+
+void PCF85xx::save(timems_t time) {
+	this->timeSaver->save(time);
+}
+timems_t PCF85xx::load() {
+	return this->timeSaver->load();
+}
+
+void PCF85xx::clearSave() {
+	this->save(((timems_t) -1));
 }

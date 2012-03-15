@@ -11,7 +11,6 @@
 void setup() {
     Serial.begin(9600);
     Serial.println("started");
-    PCF85xx::getDefaultRTC()->setup();
     PCF85xx::getDefaultRTC()->reset();
     setSyncProvider( PCF85xx::getDefaultTime );
 }

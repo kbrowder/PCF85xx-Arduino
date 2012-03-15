@@ -5,19 +5,20 @@
 #ifndef PCF85xxRTC_H_
 #define PCF85xxRTC_H_
 #include "Arduino.h"
+#include "TimeSavers.h"
 #include <Wire.h>
 #include <Time.h>
 
-struct tmElementsWithMillis{
-	  uint8_t Second;
-	  uint8_t Minute;
-	  uint8_t Hour;
-	  uint8_t Wday;   // day of week, sunday is day 1
-	  uint8_t Day;
-	  uint8_t Month;
-	  uint8_t Year;   // offset from 1970;
-	  uint16_t Milliseconds;
-	};
+struct tmElementsWithMillis {
+	uint8_t Second;
+	uint8_t Minute;
+	uint8_t Hour;
+	uint8_t Wday; // day of week, sunday is day 1
+	uint8_t Day;
+	uint8_t Month;
+	uint8_t Year; // offset from 1970;
+	uint16_t Milliseconds;
+};
 class PCF85xxTypes {
 protected:
 	enum REGISTERS {
@@ -98,40 +99,39 @@ protected:
 inline uint64_t makeTimeMilli(tmElementsWithMillis);
 inline uint64_t makeTimeMilli(tmElements_t);
 
-
-class PCF85xx: PCF85xxTypes {
+class PCF85xx: public PCF85xxTypes, public AbstractTimeSaver {
 private:
 	CONTROL controlReg;
 	static PCF85xx defaultRTC;
 	static const uint8_t READ_ADDR;
 	static const uint8_t WRITE_ADDR;
-
+	static EEPROMTimeSaver defaultTimeSaver;
 protected:
 	TwoWire wire;
-	const static uint8_t EEPROM_ADDR;
+	AbstractTimeSaver * timeSaver;
 	void initControlReg();
-	uint64_t timeFromEEPROM();
-	void timeToEEPROM(uint64_t);
 	static uint8_t to_uint8(void * s);
 public:
 	PCF85xx();
-	PCF85xx(TwoWire);
+	virtual ~PCF85xx();
+	PCF85xx(TwoWire, AbstractTimeSaver*);
+	void init(TwoWire, AbstractTimeSaver*);
 	static PCF85xx * getDefaultRTC();
 	static time_t getDefaultTime();
 	static void setDefaultTime(time_t t);
-	void init(TwoWire);
 	void setup();
 	void reset();
 	time_t get();
 	void set(time_t t);
-	void read(tmElementsWithMillis &tm);
+	virtual void read(tmElementsWithMillis &tm);
+	virtual void write(tmElementsWithMillis &tm);
 	void read(tmElements_t &tm);
 	void write(tmElements_t &tm);
-	void write(tmElementsWithMillis &tm);
-	void writeByte(uint8_t word, uint8_t value);
-	uint8_t readByte(uint8_t word);
-	uint8_t readHundredths();
-
+	virtual void writeByte(uint8_t word, uint8_t value);
+	virtual uint8_t readByte(uint8_t word);
+	virtual void save(timems_t time);
+	virtual timems_t load();
+	virtual void clearSave();
 };
 time_t PCF85xx_get();
 void PCF85xx_set(time_t t);
